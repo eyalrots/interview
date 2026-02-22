@@ -9,10 +9,9 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <signal.h>
 #include <cerrno>
 
-#define PORT "3490"
+#define PORT 3490
 #define BACKLOG 10
 
 class Server
@@ -20,7 +19,7 @@ class Server
   private:
     int listening_sockfd;
     int conn_sockfd;
-    struct addrinfo hints, *servinfo, *p;
+    struct sockaddr_in listening_addr;
   public:
     Server();
     ~Server();
