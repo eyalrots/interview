@@ -12,8 +12,17 @@
 #include <cerrno>
 #include <cstring>
 
+// these can be moved to .cpp file
+// no need to expose these to the user of the class
 #define PORT 3490
 #define BACKLOG 10
+
+// do better error handling, using enum class for error codes
+enum class Error_Code {
+    OK = 0,
+    SOCK_ERR,
+    BIND_ERR,
+};
 
 class Server
 {
@@ -27,6 +36,9 @@ class Server
     ~Server();
 
     int open_listening_socket();
+
+    // use zero initializer for this, for pure virtual function
+    // virtual void listen_and_connect() = 0;
     virtual void listen_and_connect();
 };
 
