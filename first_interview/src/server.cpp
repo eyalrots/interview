@@ -1,4 +1,5 @@
 #include "../include/server.hpp"
+#include <sys/socket.h>
 
 Server::Server()
 {
@@ -14,59 +15,24 @@ Server::Server()
 int Server::open_listening_socket()
 {
     int status = 0;
-    // int yes = 1;
 
-    // /* Get information for socket */
-    // status = getaddrinfo(NULL, PORT, &hints, &servinfo);
-    // if (status != 0) {
-    //     std::cerr << "getaddrinfo: " << gai_strerror(status) << std::endl;
-    //     return 1;
-    // }
-
-    // /* Loop through potential sockets untill you find a working one */
-    // for (p = servinfo; p != NULL; p = p->ai_next) {
-    //     /* Try to open a socket in this location - current p */
-    //     listening_sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-    //     if (listening_sockfd == -1) {
-    //         std::cerr << "Sever: socket" << std::endl;
-    //         continue;
-    //     }
-
-    //     /* Use same one as before with no problems */
-    //     status = setsockopt(listening_sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
-    //                         sizeof(int));
-    //     if (status == -1) {
-    //         std::cerr << "setsockopt" << std::endl;
-    //         exit(1);
-    //     }
-
-    //     /* Bind to selected socket */
-    //     status = bind(listening_sockfd, p->ai_addr, p->ai_addrlen);
-    //     if (status == -1) {
-    //         std::cerr << "Server: bind" << std::endl;
-    //         continue;
-    //     }
-
-    //     /* Found a socket and bounded to it */
-    //     break;
-    // }
-    
-	// /* No sockets where found */
-    // if (p == NULL) {
-    //     std::cerr << "Server: failed to bind" << std::endl;
-    //     exit(1);
-    // }
+    listening_sockfd = socket(listening_addr.sin_family, SOCK_STREAM, 0);
+    if (listening_sockfd == -1) {
+        std::cerr << "Sever: socket" << std::endl;
+    }
 
     status = bind(listening_sockfd, (struct sockaddr *)&listening_addr,
                   sizeof(listening_addr));
     if (status == -1) {
         std::cerr << "Server: bind" << std::endl;
         return 1;
-	}
+    }
     return 0;
 }
 
-void Server::listen_and_connect()
+void Server::listen_and_connect() {}
+
+void Echo_Server::listen_and_connect()
 {
     socklen_t sin_size = 0;
     char buffer[256];

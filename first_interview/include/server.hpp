@@ -17,15 +17,22 @@
 
 class Server
 {
-  private:
+  protected:
     int listening_sockfd;
     int conn_sockfd;
     struct sockaddr_in listening_addr;
+
   public:
     Server();
     ~Server();
 
     int open_listening_socket();
+    virtual void listen_and_connect();
+};
+
+class Echo_Server : public Server
+{
+  public:
     void listen_and_connect();
 };
 #endif /* SERVER_H */
