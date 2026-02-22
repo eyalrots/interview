@@ -1,6 +1,4 @@
 #include "../include/server.hpp"
-#include <netinet/in.h>
-#include <sys/socket.h>
 
 Server::Server()
 {

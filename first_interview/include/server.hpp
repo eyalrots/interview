@@ -10,6 +10,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <cerrno>
+#include <cstring>
 
 #define PORT 3490
 #define BACKLOG 10
