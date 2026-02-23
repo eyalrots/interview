@@ -1,5 +1,4 @@
 #include "../include/server.hpp"
-#include <netinet/in.h>
 
 constexpr int PORT = 3490;
 constexpr int BACKLOG = 10;
@@ -14,28 +13,13 @@ Server::Server()
                              .sin_addr = {.s_addr = INADDR_ANY}};
 
     this->listening_sockfd = 0;
-    this->conn_sockfd = 0;
 }
 
-Error_Code Server::open_listening_socket()
+Error_Code Tcp_Server::open_listening_socket()
 {
     int status;
 
-    this->listening_sockfd =
-        socket(this->listening_addr.sin_family, SOCK_STREAM, 0);
-    if (this->listening_sockfd == -1) {
-        std::cerr << "Sever: socket" << std::endl;
-        return Error_Code::SOCK_ERR;
-    }
-
-    status =
-        bind(this->listening_sockfd, (struct sockaddr *)&this->listening_addr,
-             sizeof(this->listening_addr));
-    if (status == -1) {
-        std::cerr << "Server: bind" << std::endl;
-        return Error_Code::BIND_ERR; // return ErrorCode
-    }
-    return Error_Code::OK;
+    this->listening_sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 }
 
 Error_Code Echo_Server::listen_and_connect()
@@ -65,7 +49,7 @@ Error_Code Echo_Server::listen_and_connect()
         /* Take the first connection in the queue */
         auto conn_fd = Descriptor(accept(this->listening_sockfd,
                                    (struct sockaddr *)&client_addr, &sin_size));
-        if (conn_sockfd == -1) {
+        if (conn_fd.get_fd() == -1) {
             std::cerr << "accept" << std::endl;
             continue;
         }
@@ -87,11 +71,45 @@ Error_Code Echo_Server::listen_and_connect()
     return Error_Code::OK;
 }
 
+Error_Code Dns_Sniffer::open_listening_socket()
+{
+    int status;
+
+    this->listening_sockfd =
+        socket(this->listening_addr.sin_family, SOCK_RAW, 0);
+    if (this->listening_sockfd == -1) {
+        std::cerr << "Sever: socket" << std::endl;
+        return Error_Code::SOCK_ERR;
+    }
+
+    status =
+        bind(this->listening_sockfd, (struct sockaddr *)&this->listening_addr,
+             sizeof(this->listening_addr));
+    if (status == -1) {
+        std::cerr << "Server: bind" << std::endl;
+        return Error_Code::BIND_ERR; // return ErrorCode
+    }
+    return Error_Code::OK;
+}
+
+Error_Code Dns_Sniffer::listen_and_connect()
+{
+    socklen_t sin_size = 0;
+
+    constexpr int len = 256;
+    char buffer[len] = {0};
+    int bytes_received = 0;
+    struct sockaddr_storage sniffed_addr;
+
+    memset(&sniffed_addr, 0, sizeof(sniffed_addr));
+
+    // How does a DNS sniffer work?
+    
+    return Error_Code::OK;
+}
+
 Server::~Server()
 {
-    if (this->conn_sockfd > 0) {
-        close(this->conn_sockfd);
-    }
     if (this->listening_sockfd > 0) {
         close(this->listening_sockfd);
 	}

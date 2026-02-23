@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <cerrno>
 #include <cstring>
+#include <net/ethernet.h>
 
 enum class Error_Code { OK = 0, SOCK_ERR, BIND_ERR, LISTEN_ERR };
 
@@ -38,20 +39,33 @@ class Server
 {
   protected:
     int listening_sockfd;
-    int conn_sockfd;
     struct sockaddr_in listening_addr;
 
   public:
     Server();
     ~Server();
 
-    Error_Code open_listening_socket();
+    virtual Error_Code open_listening_socket() = 0;
     virtual Error_Code listen_and_connect() = 0;
 };
 
-class Echo_Server : public Server
+class Tcp_Server : public Server
+{
+  public:
+    Error_Code open_listening_socket() override;
+};
+
+class Echo_Server : public Tcp_Server
 {
   public:
     Error_Code listen_and_connect() override;
 };
+
+class Dns_Sniffer : public Server
+{
+  public:
+    Error_Code open_listening_socket() override;
+    Error_Code listen_and_connect() override;
+};
+
 #endif /* SERVER_H */
