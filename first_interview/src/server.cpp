@@ -59,18 +59,19 @@ Error_Code Echo_Server::listen_and_connect()
     std::cout << "server: waiting for connections..." << std::endl;
 
     while (true) {
+        
         sin_size = sizeof(client_addr);
 
         /* Take the first connection in the queue */
-        this->conn_sockfd = accept(this->listening_sockfd,
-                                   (struct sockaddr *)&client_addr, &sin_size);
+        auto conn_fd = Descriptor(accept(this->listening_sockfd,
+                                   (struct sockaddr *)&client_addr, &sin_size));
         if (conn_sockfd == -1) {
             std::cerr << "accept" << std::endl;
             continue;
         }
 
         /* Receive a message */
-        bytes_reveived = recv(conn_sockfd, buffer, len, 0);
+        bytes_reveived = recv(conn_fd.get_fd(), buffer, len, 0);
         if (bytes_reveived == -1) {
             std::cerr << "Server: receive" << std::endl;
             continue;
@@ -78,13 +79,10 @@ Error_Code Echo_Server::listen_and_connect()
 
         /* Send the message that was received */
         buffer[bytes_reveived] = '\0';
-        if (send(conn_sockfd, buffer, bytes_reveived, 0) == -1) {
+        if (send(conn_fd.get_fd(), buffer, bytes_reveived, 0) == -1) {
             std::cerr << "Server: send" << std::endl;
             continue;
         }
-
-        /* close current connection */
-        close(this->conn_sockfd);
     }
     return Error_Code::OK;
 }
