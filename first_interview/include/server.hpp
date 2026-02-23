@@ -5,6 +5,8 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/ip.h>
+#include <netinet/udp.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -12,6 +14,7 @@
 #include <cerrno>
 #include <cstring>
 #include <net/ethernet.h>
+#include <linux/if_packet.h>
 
 enum class Error_Code { OK = 0, SOCK_ERR, BIND_ERR, LISTEN_ERR };
 
@@ -32,6 +35,31 @@ class Descriptor
     int get_fd()
     {
         return this->fd;
+    }
+};
+
+class My_packet
+{
+  private:
+    struct iphdr* iph;
+    struct udphdr* udph;
+    char *data;
+
+  public:
+    My_packet(struct iphdr* iph, struct udphdr* udph, char* data);
+    ~My_packet();
+
+    struct iphdr* ip_header()
+    {
+        return this->iph;
+    }
+    struct udphdr* udp_header()
+    {
+        return this->udph;
+    }
+    char* get_data()
+    {
+        return this->data;
     }
 };
 

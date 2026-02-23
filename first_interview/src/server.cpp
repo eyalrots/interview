@@ -1,7 +1,43 @@
 #include "../include/server.hpp"
+#include <string>
 
 constexpr int PORT = 3490;
 constexpr int BACKLOG = 10;
+constexpr int UDP_NUM = 17;
+constexpr int DNS_PORT = 53;
+
+My_packet::My_packet(struct iphdr* iph, struct udphdr* udph, char* data)
+{
+    this->iph = iph;
+    this->udph = udph;
+    this->data = data;
+}
+
+Error_Code process_packet(char *buffer, My_packet * &p)
+{
+    struct iphdr *iph;
+    struct udphdr *udph;
+    char *data;
+
+    int iph_size = 0;
+
+    p = NULL;
+
+    iph = (struct iphdr *)buffer;
+    if (iph->protocol != UDP_NUM) {
+        return Error_Code::OK;
+    }
+    iph_size = iph->ihl * 4;
+    udph = (struct udphdr *)(buffer + iph_size);
+    if (ntohs(udph->dest) != DNS_PORT) {
+        return Error_Code::OK;
+    }
+    data = buffer + iph_size + sizeof(*udph);
+
+    p = new My_packet(iph, udph, data);
+
+    return Error_Code::OK;
+}
 
 Server::Server()
 {
@@ -19,7 +55,21 @@ Error_Code Tcp_Server::open_listening_socket()
 {
     int status;
 
-    this->listening_sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    this->listening_sockfd =
+        socket(this->listening_addr.sin_family, SOCK_RAW, 0);
+    if (this->listening_sockfd == -1) {
+        std::cerr << "Sever: socket" << std::endl;
+        return Error_Code::SOCK_ERR;
+    }
+
+    status =
+        bind(this->listening_sockfd, (struct sockaddr *)&this->listening_addr,
+             sizeof(this->listening_addr));
+    if (status == -1) {
+        std::cerr << "Server: bind" << std::endl;
+        return Error_Code::BIND_ERR; // return ErrorCode
+    }
+    return Error_Code::OK;
 }
 
 Error_Code Echo_Server::listen_and_connect()
@@ -73,37 +123,43 @@ Error_Code Echo_Server::listen_and_connect()
 
 Error_Code Dns_Sniffer::open_listening_socket()
 {
-    int status;
-
-    this->listening_sockfd =
-        socket(this->listening_addr.sin_family, SOCK_RAW, 0);
+    this->listening_sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (this->listening_sockfd == -1) {
-        std::cerr << "Sever: socket" << std::endl;
+        std::cerr << "DNS Sniffer: socket" << std::endl;
         return Error_Code::SOCK_ERR;
     }
-
-    status =
-        bind(this->listening_sockfd, (struct sockaddr *)&this->listening_addr,
-             sizeof(this->listening_addr));
-    if (status == -1) {
-        std::cerr << "Server: bind" << std::endl;
-        return Error_Code::BIND_ERR; // return ErrorCode
-    }
+    
     return Error_Code::OK;
 }
 
 Error_Code Dns_Sniffer::listen_and_connect()
 {
     socklen_t sin_size = 0;
-
-    constexpr int len = 256;
+    constexpr int len = 2048; /* 2K sized buffer */
     char buffer[len] = {0};
     int bytes_received = 0;
     struct sockaddr_storage sniffed_addr;
+    My_packet *cur_packet = NULL;
 
     memset(&sniffed_addr, 0, sizeof(sniffed_addr));
 
     // How does a DNS sniffer work?
+    sin_size = sizeof(sniffed_addr);
+	
+    while (true) {
+        bytes_received = recvfrom(this->listening_sockfd, buffer, len, 0,
+                                  (struct sockaddr *)&sniffed_addr, &sin_size);
+        if (bytes_received == -1) {
+            std::cerr << "DNS Sniffer: receive" << std::endl;
+            continue;
+        }
+        process_packet(buffer, cur_packet);
+        if (cur_packet == NULL) {
+            continue;
+		}
+        std::cout << "Domain: " << cur_packet->get_data() << std::endl;
+        delete cur_packet;
+	}
     
     return Error_Code::OK;
 }
