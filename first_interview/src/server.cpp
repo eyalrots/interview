@@ -1,52 +1,59 @@
 #include "../include/server.hpp"
-#include <sys/socket.h>
+#include <netinet/in.h>
+
+constexpr int PORT = 3490;
+constexpr int BACKLOG = 10;
 
 Server::Server()
 {
-    memset(&listening_addr, 0, sizeof(listening_addr));
-    listening_addr.sin_family = AF_INET;
-    listening_addr.sin_port = htons(PORT);
-    listening_addr.sin_addr.s_addr = INADDR_ANY;
+    memset(&this->listening_addr, 0, sizeof(this->listening_addr));
 
-    listening_sockfd = 0;
-    conn_sockfd = 0;
+    this->listening_addr =
+        (struct sockaddr_in){.sin_family = AF_INET,
+                             .sin_port = htons(PORT),
+                             .sin_addr = {.s_addr = INADDR_ANY}};
+
+    this->listening_sockfd = 0;
+    this->conn_sockfd = 0;
 }
 
-int Server::open_listening_socket()
+Error_Code Server::open_listening_socket()
 {
-    int status = 0;
+    int status;
 
-    listening_sockfd = socket(listening_addr.sin_family, SOCK_STREAM, 0);
-    if (listening_sockfd == -1) {
+    this->listening_sockfd =
+        socket(this->listening_addr.sin_family, SOCK_STREAM, 0);
+    if (this->listening_sockfd == -1) {
         std::cerr << "Sever: socket" << std::endl;
+        return Error_Code::SOCK_ERR;
     }
 
-    status = bind(listening_sockfd, (struct sockaddr *)&listening_addr,
-                  sizeof(listening_addr));
+    status =
+        bind(this->listening_sockfd, (struct sockaddr *)&this->listening_addr,
+             sizeof(this->listening_addr));
     if (status == -1) {
         std::cerr << "Server: bind" << std::endl;
-        return 1;
+        return Error_Code::BIND_ERR; // return ErrorCode
     }
-    return 0;
+    return Error_Code::OK;
 }
 
-void Server::listen_and_connect() {}
-
-void Echo_Server::listen_and_connect()
+Error_Code Echo_Server::listen_and_connect()
 {
     socklen_t sin_size = 0;
-    char buffer[256];
-    int len = 256;
-    int msg_len = 0;
-    int bytes_sent = 0;
+
+    constexpr int len = 256;
+    char buffer[len] = {0};
+
+    int bytes_reveived = 0;
     struct sockaddr_storage client_addr;
 
     memset(&client_addr, 0, sizeof(client_addr));
-    memset(buffer, 0, sizeof(buffer));
 
     /* Listen for incomming connections */
-    if (listen(listening_sockfd, BACKLOG) == -1) {
+    if (listen(this->listening_sockfd, BACKLOG) == -1) {
         std::cerr << "listen" << std::endl;
+        return Error_Code::LISTEN_ERR;
     }
 
     std::cout << "server: waiting for connections..." << std::endl;
@@ -55,30 +62,39 @@ void Echo_Server::listen_and_connect()
         sin_size = sizeof(client_addr);
 
         /* Take the first connection in the queue */
-        conn_sockfd = accept(listening_sockfd, (struct sockaddr *)&client_addr,
-                             &sin_size);
+        this->conn_sockfd = accept(this->listening_sockfd,
+                                   (struct sockaddr *)&client_addr, &sin_size);
         if (conn_sockfd == -1) {
             std::cerr << "accept" << std::endl;
             continue;
         }
 
         /* Receive a message */
-        if (recv(conn_sockfd, buffer, len, 0) == -1) {
+        bytes_reveived = recv(conn_sockfd, buffer, len, 0);
+        if (bytes_reveived == -1) {
             std::cerr << "Server: receive" << std::endl;
             continue;
         }
 
         /* Send the message that was received */
-        msg_len = strlen(buffer);
-        if (send(conn_sockfd, buffer, msg_len, 0) == -1) {
+        buffer[bytes_reveived] = '\0';
+        if (send(conn_sockfd, buffer, bytes_reveived, 0) == -1) {
             std::cerr << "Server: send" << std::endl;
             continue;
         }
+
+        /* close current connection */
+        close(this->conn_sockfd);
     }
+    return Error_Code::OK;
 }
 
 Server::~Server()
 {
-    close(conn_sockfd);
-    close(listening_sockfd);
+    if (this->conn_sockfd > 0) {
+        close(this->conn_sockfd);
+    }
+    if (this->listening_sockfd > 0) {
+        close(this->listening_sockfd);
+	}
 }

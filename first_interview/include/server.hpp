@@ -12,8 +12,12 @@
 #include <cerrno>
 #include <cstring>
 
-#define PORT 3490
-#define BACKLOG 10
+enum class Error_Code {
+    OK = 0,
+    SOCK_ERR,
+    BIND_ERR,
+    LISTEN_ERR
+};
 
 class Server
 {
@@ -26,13 +30,13 @@ class Server
     Server();
     ~Server();
 
-    int open_listening_socket();
-    virtual void listen_and_connect();
+    Error_Code open_listening_socket();
+    virtual Error_Code listen_and_connect() = 0;
 };
 
 class Echo_Server : public Server
 {
   public:
-    void listen_and_connect();
+    Error_Code listen_and_connect() override;
 };
 #endif /* SERVER_H */
