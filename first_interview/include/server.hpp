@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <arpa/inet.h>
+#include <linux/if_ether.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -41,25 +42,47 @@ class Descriptor
 class My_packet
 {
   private:
-    struct iphdr* iph;
-    struct udphdr* udph;
-    char *data;
+    char *raw;
+    int l3_offset;
+    int l4_offset;
+    int l5_offset;
 
   public:
-    My_packet(struct iphdr* iph, struct udphdr* udph, char* data);
+    My_packet(char * packet);
     ~My_packet();
+
+    struct ethhdr *ethernet_header()
+    {
+        if (!this->raw) {
+            return NULL;
+        }
+
+        return reinterpret_cast<struct ethhdr *>(this->raw);
+    }
 
     struct iphdr* ip_header()
     {
-        return this->iph;
+        if (!this->raw || !this->l3_offset) {
+            return NULL;
+        }
+
+        return reinterpret_cast<struct iphdr *>(this->raw + this->l3_offset);
     }
     struct udphdr* udp_header()
     {
-        return this->udph;
+        if (!this->raw || !this->l4_offset) {
+            return NULL;
+        }
+        
+        return reinterpret_cast<struct udphdr *>(this->raw + this->l4_offset);
     }
-    char* get_data()
+    char* dns_data()
     {
-        return this->data;
+        if (!this->raw || !this->l5_offset) {
+            return NULL;
+        }
+        
+        return (this->raw + this->l5_offset);
     }
 };
 

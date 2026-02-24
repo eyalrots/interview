@@ -1,4 +1,5 @@
 #include "../include/server.hpp"
+#include <linux/if_ether.h>
 #include <string>
 
 constexpr int PORT = 3490;
@@ -6,37 +7,37 @@ constexpr int BACKLOG = 10;
 constexpr int UDP_NUM = 17;
 constexpr int DNS_PORT = 53;
 
-My_packet::My_packet(struct iphdr* iph, struct udphdr* udph, char* data)
+My_packet::My_packet(char* packet)
 {
-    this->iph = iph;
-    this->udph = udph;
-    this->data = data;
-}
+    this->raw = packet;
+    this->l3_offset = 0;
+    this->l4_offset = 0;
+    this->l5_offset = 0;
 
-Error_Code process_packet(char *buffer, My_packet * &p)
-{
-    struct iphdr *iph;
-    struct udphdr *udph;
-    char *data;
+    size_t l3_size = 0;
+    size_t l4_size = 0;
 
-    int iph_size = 0;
-
-    p = NULL;
-
-    iph = (struct iphdr *)buffer;
-    if (iph->protocol != UDP_NUM) {
-        return Error_Code::OK;
+    /* Get layer two header (ethernet) */
+    auto eth_hdr = reinterpret_cast<struct ethhdr *>(packet);
+    if (eth_hdr->h_proto != ETH_P_IP) {
+        return; /* We are only intrested in IPv4 */
     }
-    iph_size = iph->ihl * 4;
-    udph = (struct udphdr *)(buffer + iph_size);
-    if (ntohs(udph->dest) != DNS_PORT) {
-        return Error_Code::OK;
+	l3_size = sizeof(struct ethhdr);
+    /* Get layer three header (IP) */
+    auto ip_hdr = reinterpret_cast<struct iphdr *>(packet + l3_size);
+    if (ip_hdr->protocol != UDP_NUM) {
+        return; /* We are only intrested in UDP (for DNS) */
     }
-    data = buffer + iph_size + sizeof(*udph);
+    l4_size = l3_size + sizeof(struct iphdr);
+    /* Get layer four (UDP) */
+    auto udp_hdr = reinterpret_cast<struct udphdr *>(packet + l4_size);
+    if (udp_hdr->dest != DNS_PORT) {
+        return; /* We are only intrested in port 53 (for DNS) */
+    }
 
-    p = new My_packet(iph, udph, data);
-
-    return Error_Code::OK;
+    this->l3_offset = l3_size;
+    this->l4_offset = l4_size;
+    this->l5_offset = l4_size + sizeof(struct udphdr);
 }
 
 Server::Server()
@@ -139,7 +140,6 @@ Error_Code Dns_Sniffer::listen_and_connect()
     char buffer[len] = {0};
     int bytes_received = 0;
     struct sockaddr_storage sniffed_addr;
-    My_packet *cur_packet = NULL;
 
     memset(&sniffed_addr, 0, sizeof(sniffed_addr));
 
@@ -153,12 +153,9 @@ Error_Code Dns_Sniffer::listen_and_connect()
             std::cerr << "DNS Sniffer: receive" << std::endl;
             continue;
         }
-        process_packet(buffer, cur_packet);
-        if (cur_packet == NULL) {
-            continue;
-		}
-        std::cout << "Domain: " << cur_packet->get_data() << std::endl;
-        delete cur_packet;
+        auto cur_packet = My_packet(buffer);
+        
+        std::cout << "Domain: " << cur_packet.dns_data() << std::endl;
 	}
     
     return Error_Code::OK;
